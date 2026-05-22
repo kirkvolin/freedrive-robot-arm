@@ -1,8 +1,5 @@
 """
 Arm Controller & Kinematics
-============================
-Forward kinematics via DH parameters.
-Inverse kinematics via damped least-squares (Jacobian) method.
 """
 
 import math
@@ -29,7 +26,6 @@ def dh_matrix(theta: float, d: float, a: float, alpha: float) -> np.ndarray:
 
 # DH parameters for a 6-DOF arm approximating SO-ARM101 geometry
 # Each row: (theta_offset, d, a, alpha) in mm and radians
-# These define the arm's physical dimensions — adjust to match your printed parts
 DH_PARAMS = [
     # Joint 1: Base rotation (around Y axis)
     {"d": 65.0,  "a": 0.0,   "alpha": math.pi / 2},
@@ -43,17 +39,12 @@ DH_PARAMS = [
     {"d": 80.0,  "a": 0.0,   "alpha": 0.0},
 ]
 
-# Joint angle offsets (some joints need a 90° offset in DH convention)
+# Joint angle offsets 
 THETA_OFFSETS = [0.0, math.pi / 2, 0.0, 0.0, 0.0]
 
 
 def forward_kinematics(angles_deg: List[float]) -> List[np.ndarray]:
-    """
-    Compute FK for joints 1-5 (gripper is joint 6 but doesn't affect position).
 
-    Returns list of 4x4 transforms from base to each joint frame,
-    plus a list of (x, y, z) positions for visualization.
-    """
     angles_rad = [math.radians(a) for a in angles_deg[:5]]
     transforms = []
     positions = [(0.0, 0.0, 0.0)]  # Base origin
@@ -80,10 +71,7 @@ def get_end_effector(angles_deg: List[float]) -> np.ndarray:
 # ============================================================
 
 def compute_jacobian(angles_deg: List[float], delta: float = 0.1) -> np.ndarray:
-    """
-    Numerical Jacobian: how does end effector move when each joint changes?
-    Returns 3x5 matrix (xyz position vs 5 joint angles).
-    """
+
     ee = get_end_effector(angles_deg)
     J = np.zeros((3, 5))
 
@@ -99,19 +87,7 @@ def compute_jacobian(angles_deg: List[float], delta: float = 0.1) -> np.ndarray:
 def inverse_kinematics(target: np.ndarray, current_angles: List[float],
                        max_iter: int = 50, tolerance: float = 1.0,
                        damping: float = 5.0) -> Optional[List[float]]:
-    """
-    Damped least-squares IK solver.
 
-    Args:
-        target: desired (x, y, z) end effector position in mm
-        current_angles: starting joint angles (6 values, only first 5 used for IK)
-        max_iter: maximum solver iterations
-        tolerance: position error threshold in mm
-        damping: damping factor (higher = more stable, slower convergence)
-
-    Returns:
-        New joint angles list (6 values) or None if not reachable
-    """
     angles = list(current_angles[:5])
     joint_limits = [
         (-150, 150),   # Base

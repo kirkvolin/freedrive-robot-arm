@@ -1,9 +1,3 @@
-"""
-Servo Abstraction Layer
-=======================
-Swap SimulatedServo for HiwonderServo when real hardware arrives.
-Both implement the same interface so the rest of the code doesn't change.
-"""
 
 import math
 import time
@@ -23,7 +17,7 @@ class ServoStatus:
 
 
 class SimulatedServo:
-    """Drop-in simulated servo matching HX-30HM behavior."""
+    """Simulated servo matching HX-30HM behavior."""
 
     def __init__(self, servo_id: int, label: str = "",
                  home_position: int = 2048,
@@ -88,11 +82,11 @@ class SimulatedServo:
 
 
 # ============================================================
-# Future: HiwonderServo (uncomment when hardware arrives)
+# Future: HiwonderServo 
 # ============================================================
 #
 # class HiwonderServo:
-#     """Real HX-30HM servo via BusLinker serial."""
+#     """HX-30HM servo via BusLinker serial."""
 #
 #     def __init__(self, servo_id: int, bus, label: str = "", ...):
 #         self.id = servo_id

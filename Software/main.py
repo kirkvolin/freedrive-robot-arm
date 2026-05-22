@@ -2,14 +2,6 @@
 Robot Arm Simulator
 ====================
 3D visualization with joint sliders and IK end-effector dragging.
-
-Controls:
-  - Left-click + drag on viewport: orbit camera
-  - Right-click + drag on end effector (red dot): IK drag mode
-  - Joint sliders: direct joint control
-  - Keyboard shortcuts shown in the UI
-
-Run:  python main.py
 """
 
 import sys
@@ -18,10 +10,6 @@ import time
 import pygame
 import numpy as np
 from arm_controller import ArmController, TrajectoryRecorder, forward_kinematics
-
-# ============================================================
-# COLORS
-# ============================================================
 
 BG             = (13, 17, 23)
 PANEL_BG       = (22, 27, 34)
