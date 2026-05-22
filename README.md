@@ -1,83 +1,174 @@
-# 6-DOF Robot Arm Simulator
+# Freedrive Teachable Robot Arm with GUI
 
-A Python-based 3D robot arm simulator with forward/inverse kinematics,
-teach-and-playback, and a clean servo abstraction layer for swapping in
-real Hiwonder HX-30HM hardware.
+A 6-DOF robot arm you teach by hand — grab it, guide it through positions, save waypoints, and build motion programs. No leader arm, no code, no joystick.
 
-## Setup
+Built on the [SO-ARM101](https://github.com/TheRobotStudio/SO-ARM100) open-source platform with hardware and software modifications to support single-arm freedrive teaching without a leader arm.
+
+## Why This Exists
+
+The SO-ARM101 is designed for leader-follower teleoperation: you physically puppet a second "leader" arm to control the "follower." This works well for imitation learning pipelines like [LeRobot](https://github.com/huggingface/lerobot), but it means you need two arms, and the workflow is geared toward ML data collection rather than manual program building.
+
+Industrial robots from Universal Robots, FANUC, and others offer a different interaction model — **freedrive mode** — where you grab the robot itself, guide it through positions by hand, and tap "save" at each point to build a program. No second arm, no code, no joystick. ArmCTL brings that workflow to a $200 desktop arm.
+
+## Hardware Changes
+
+### Motors: Hiwonder HX-30HM (replacing Feetech STS3215)
+
+The SO-ARM101 normally uses Feetech STS3215 servos. These have two torque states: holding (rigid) or unloaded (completely limp). For leader-follower this is fine — the leader arm is always limp. But for single-arm freedrive, "completely limp" means the arm drops under gravity the moment you let go, making hand-guiding awkward.
+
+The HX-30HM solves this with its **motor mode at zero speed**, which provides electromagnetic braking — a controllable drag that resists movement without locking the joint. The arm feels like it's moving through viscous fluid rather than either fighting a locked servo or catching a falling one. This is the core enabler for comfortable single-arm teach.
+
+Other advantages over the STS3215:
+
+- **12-bit magnetic encoder** (4096 counts/revolution) vs potentiometer feedback — ~4× position resolution, wear-free, full 360° sensing
+- **30 kg·cm torque at 12V** — same as the STS3215 but with the encoder and mode advantages
+- **Same 20×40mm form factor** — drop-in compatible with SO-ARM101 printed parts
+
+### Controller: Hiwonder BusLinker V3.0
+
+USB-to-serial adapter for the Hiwonder servo bus. All six servos daisy-chain on a single half-duplex UART at 115200 baud. One board, one USB cable, one bus.
+
+### Bill of Materials
+
+| Part | Qty | ~Cost |
+|------|-----|-------|
+| Hiwonder HX-30HM servo | 6 | $90 |
+| BusLinker V3.0 | 1 | $15 |
+| 12V 5A power supply | 1 | $15 |
+| 3D printed parts (PETG) | 1 set | $10-20 in filament |
+| M2/M3 hardware, cables | misc | $10 |
+| **Total** | | **~$130-150** |
+
+## Software Architecture
+
+```
+armctl/
+├── core/
+│   ├── arm.py             # ArmController — central API
+│   ├── kinematics.py      # Forward/inverse kinematics (DH parameters, Jacobian IK)
+│   ├── trajectory.py      # Trapezoidal velocity interpolation, threaded playback
+│   └── waypoint.py        # Waypoint & Program models, JSON persistence
+├── drivers/
+│   ├── base.py            # ServoDriver ABC
+│   ├── simulated.py       # Simulated driver for development without hardware
+│   └── hiwonder.py        # HX-30HM protocol driver via BusLinker serial
+├── config/
+│   └── arm_config.py      # DH parameters, joint limits, servo mappings
+├── gui/                   # Desktop GUI (planned)
+├── main.py                # Entry point
+└── setup_hardware.py      # Hardware setup, testing, and servo ID configuration
+```
+
+### Driver Abstraction
+
+Everything above the `drivers/` layer talks to an abstract `ServoDriver` interface. Swap one import to switch between simulated and real hardware — develop and test motion programs without the arm plugged in, then run them on real hardware with no code changes.
+
+### Freedrive Implementation
+
+Freedrive mode unloads servo torque and continuously reads joint positions via the magnetic encoders at ~10 Hz. The arm can be moved freely by hand while the software tracks exactly where it is. Press a key to snapshot the current joint angles as a named waypoint.
+
+For smoother feel, the driver can optionally engage electromagnetic braking (motor mode, speed=0) instead of full unload, providing tunable resistance.
+
+### Kinematics
+
+Forward kinematics via DH parameter chain. Inverse kinematics using a damped least-squares Jacobian solver (~1.3mm accuracy). Supports both joint-space jogging and Cartesian jogging (X/Y/Z step moves resolved through IK).
+
+### Motion Programs
+
+Programs are ordered lists of waypoints with per-step speed and delay settings. Playback uses trapezoidal velocity profiles for smooth acceleration/deceleration. Programs save as JSON and support looping.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- A 3D printer (for the arm structure)
+- The hardware listed above
+
+### Install
 
 ```bash
-# Create a virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate   # Linux/Mac
-# venv\Scripts\activate    # Windows
-
-# Install dependencies
+git clone https://github.com/YOUR_USERNAME/armctl.git
+cd armctl
 pip install -r requirements.txt
 ```
 
-## Run
+### First-Time Servo Setup
+
+Connect servos **one at a time** to assign unique bus IDs:
 
 ```bash
-python main.py
+python setup_hardware.py --port COM3 set_id -1 1   # First servo -> ID 1
+# disconnect, connect next servo
+python setup_hardware.py --port COM3 set_id -1 2   # Second servo -> ID 2
+# ... repeat for IDs 3-6
 ```
 
-## Controls
+### Test Hardware
 
-| Input                         | Action                              |
-|-------------------------------|-------------------------------------|
-| Left-drag on viewport         | Orbit camera                        |
-| Right-drag anywhere           | IK drag (move end effector)         |
-| Left-click near end effector  | IK drag (move end effector)         |
-| Joint sliders                 | Direct joint angle control          |
-| `H`                           | Home all joints                     |
-| `F`                           | Toggle freedrive mode               |
-| `R`                           | Start/stop recording trajectory     |
-| `P`                           | Play/stop trajectory playback       |
-| `Esc`                         | Quit                                |
+Daisy-chain all servos, then:
 
-## Project Structure
-
-```
-robot_arm/
-├── main.py              # PyGame app: visualization, UI, event loop
-├── arm_controller.py    # Kinematics (FK/IK), ArmController, TrajectoryRecorder
-├── servo_interface.py   # Servo abstraction (SimulatedServo → HiwonderServo)
-├── requirements.txt
-└── README.md
+```bash
+python setup_hardware.py scan          # Verify all 6 respond
+python setup_hardware.py test          # Wiggle each servo ±30°
+python setup_hardware.py freedrive     # Unload all, print live angles
+python setup_hardware.py center        # All servos to center position
+python setup_hardware.py interactive   # Python shell with driver object
 ```
 
-## Architecture: Swapping in Real Hardware
+### Run
 
-The servo layer is designed for a clean swap. When your HX-30HM motors
-arrive, you'll:
+```bash
+# Simulated mode (no hardware needed)
+python main.py --no-gui
 
-1. Create a `HiwonderServo` class in `servo_interface.py` with the same
-   methods: `set_position()`, `get_angle()`, `set_damping()`, etc.
-2. Open a serial connection to the BusLinker board.
-3. Replace `SimulatedServo(...)` with `HiwonderServo(...)` in
-   `arm_controller.py`.
-4. Everything else (kinematics, UI, recording) stays identical.
+# Real hardware
+python main.py --real COM3 --no-gui
+```
 
-## DH Parameters
-
-The arm geometry is defined in `arm_controller.py` as DH parameters.
-Adjust these to match your actual 3D-printed link lengths:
+In the interactive shell:
 
 ```python
-DH_PARAMS = [
-    {"d": 65.0,  "a": 0.0,   "alpha": π/2},   # Base height
-    {"d": 0.0,   "a": 105.0, "alpha": 0.0},    # Upper arm length
-    {"d": 0.0,   "a": 100.0, "alpha": 0.0},    # Forearm length
-    {"d": 0.0,   "a": 0.0,   "alpha": π/2},    # Wrist
-    {"d": 80.0,  "a": 0.0,   "alpha": 0.0},    # End effector offset
-]
+arm.set_freedrive(True)                    # Enable freedrive
+# ... move arm by hand to desired position ...
+arm.save_waypoint("pick")                  # Save current position
+arm.set_freedrive(False)                   # Lock joints
+
+arm.move_to_waypoint("pick")              # Replay a waypoint
+arm.move_joints([30, 45, -30, 0, 0, 80])  # Direct joint command
+arm.jog_cartesian(2, 10)                  # Move 10mm in Z
+
+arm.run_program("my_program")             # Play a saved program
 ```
 
-## Next Steps
+## Mechanical Design
 
-- [ ] Implement HiwonderServo class with BusLinker serial protocol
-- [ ] Add Cartesian jog buttons (X/Y/Z ± step)
-- [ ] Waypoint save/load (JSON)
-- [ ] Gravity compensation for better freedrive
-- [ ] Simple program editor (sequence of waypoints + delays)
+The arm structure uses [SO-ARM101 follower STL files](https://github.com/TheRobotStudio/SO-ARM100/tree/main/STL/SO101/Individual) printed in PETG at 40%+ infill. The HX-30HM shares the STS3215 form factor, so the parts are dimensionally compatible.
+
+**Print resources:**
+- [SO-ARM101 STLs (GitHub)](https://github.com/TheRobotStudio/SO-ARM100/tree/main/STL/SO101/Individual)
+- [MakerWorld plate layouts](https://makerworld.com/en/models/908660-so-arm101)
+- [Assembly guide (Seeed Studio wiki)](https://wiki.seeedstudio.com/lerobot_so100m_new/)
+
+## Roadmap
+
+- [x] Hiwonder HX-30HM serial protocol driver
+- [x] Forward/inverse kinematics engine
+- [x] Trajectory interpolation with trapezoidal profiles
+- [x] Waypoint and program system with JSON persistence
+- [x] Hardware setup and test tooling
+- [ ] PyQt6 desktop GUI (3D viewport, joint sliders, program builder)
+- [ ] Cartesian jog buttons in GUI
+- [ ] Gravity compensation for improved freedrive feel
+- [ ] Custom arm redesign with longer links and stiffer joints
+- [ ] ROS2/MoveIt integration for collision-aware motion planning
+
+## Acknowledgments
+
+- [The Robot Studio](https://github.com/TheRobotStudio) — SO-ARM100/101 open-source arm design
+- [Hugging Face LeRobot](https://github.com/huggingface/lerobot) — robotics learning framework and community
+- [Hiwonder](https://www.hiwonder.com/) — HX-30HM servos and BusLinker controller
+
+## License
+
+MIT
