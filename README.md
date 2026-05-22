@@ -77,69 +77,6 @@ Forward kinematics via DH parameter chain. Inverse kinematics using a damped lea
 
 Programs are ordered lists of waypoints with per-step speed and delay settings. Playback uses trapezoidal velocity profiles for smooth acceleration/deceleration. Programs save as JSON and support looping.
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.10+
-- A 3D printer (for the arm structure)
-- The hardware listed above
-
-### Install
-
-```bash
-git clone https://github.com/YOUR_USERNAME/armctl.git
-cd armctl
-pip install -r requirements.txt
-```
-
-### First-Time Servo Setup
-
-Connect servos **one at a time** to assign unique bus IDs:
-
-```bash
-python setup_hardware.py --port COM3 set_id -1 1   # First servo -> ID 1
-# disconnect, connect next servo
-python setup_hardware.py --port COM3 set_id -1 2   # Second servo -> ID 2
-# ... repeat for IDs 3-6
-```
-
-### Test Hardware
-
-Daisy-chain all servos, then:
-
-```bash
-python setup_hardware.py scan          # Verify all 6 respond
-python setup_hardware.py test          # Wiggle each servo ±30°
-python setup_hardware.py freedrive     # Unload all, print live angles
-python setup_hardware.py center        # All servos to center position
-python setup_hardware.py interactive   # Python shell with driver object
-```
-
-### Run
-
-```bash
-# Simulated mode (no hardware needed)
-python main.py --no-gui
-
-# Real hardware
-python main.py --real COM3 --no-gui
-```
-
-In the interactive shell:
-
-```python
-arm.set_freedrive(True)                    # Enable freedrive
-# ... move arm by hand to desired position ...
-arm.save_waypoint("pick")                  # Save current position
-arm.set_freedrive(False)                   # Lock joints
-
-arm.move_to_waypoint("pick")              # Replay a waypoint
-arm.move_joints([30, 45, -30, 0, 0, 80])  # Direct joint command
-arm.jog_cartesian(2, 10)                  # Move 10mm in Z
-
-arm.run_program("my_program")             # Play a saved program
-```
 
 ## Mechanical Design
 
