@@ -27,7 +27,13 @@ THETA_OFFSETS = [0.0, math.pi/2, 0.0, 0.0, 0.0]
 
 def forward_kinematics(angles_deg):
     angles_rad = [math.radians(a) for a in angles_deg[:5]]
-    positions = [(0.0, 0.0, 0.0)]; T = np.eye(4); transforms = []
+    positions = [(0.0, 0.0, 0.0)]
+    # Rx(-90°): makes Z_base = world Y so the d=65 base link rises vertically off the grid
+    T = np.array([[1., 0., 0., 0.],
+                  [0., 0., 1., 0.],
+                  [0.,-1., 0., 0.],
+                  [0., 0., 0., 1.]])
+    transforms = []
     for i, (angle, params) in enumerate(zip(angles_rad, DH_PARAMS)):
         T = T @ dh_matrix(angle + THETA_OFFSETS[i], params["d"], params["a"], params["alpha"])
         transforms.append(T.copy()); positions.append((T[0,3], T[1,3], T[2,3]))
@@ -276,8 +282,8 @@ class ProgramPlayer:
 class ArmController:
     def __init__(self):
         self.servos = [
-            SimulatedServo(1, "J1 Base",       home_position=3276, min_angle=-150, max_angle=150),
-            SimulatedServo(2, "J2 Shoulder",    home_position=0,    min_angle=-90,  max_angle=90),
+            SimulatedServo(1, "J1 Base",       home_position=2048, min_angle=-150, max_angle=150),
+            SimulatedServo(2, "J2 Shoulder",    home_position=2048, min_angle=-90,  max_angle=90),
             SimulatedServo(3, "J3 Elbow",       home_position=2048, min_angle=-120, max_angle=120),
             SimulatedServo(4, "J4 Wrist Pitch", home_position=2048, min_angle=-100, max_angle=100),
             SimulatedServo(5, "J5 Wrist Roll",  home_position=2048, min_angle=-150, max_angle=150),
