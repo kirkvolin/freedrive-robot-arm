@@ -14,15 +14,12 @@ Industrial robots from Universal Robots, FANUC, and others offer a different int
 
 ### Motors: Hiwonder HX-30HM (replacing Feetech STS3215)
 
-The SO-ARM101 normally uses Feetech STS3215 servos. These have two torque states: holding (rigid) or unloaded (completely limp). For leader-follower this is fine — the leader arm is always limp. But for single-arm freedrive, "completely limp" means the arm drops under gravity the moment you let go, making hand-guiding awkward.
+The SO-ARM101 normally uses Feetech STS3215 servos. The HX-30HM was chosen as a drop-in replacement for a few reasons:
 
-The HX-30HM solves this with its **motor mode at zero speed**, which provides electromagnetic braking — a controllable drag that resists movement without locking the joint. The arm feels like it's moving through viscous fluid rather than either fighting a locked servo or catching a falling one. This is the core enabler for comfortable single-arm teach.
-
-Other advantages over the STS3215:
-
-- **12-bit magnetic encoder** (4096 counts/revolution) vs potentiometer feedback — ~4× position resolution, wear-free, full 360° sensing
-- **30 kg·cm torque at 12V** — same as the STS3215 but with the encoder and mode advantages
-- **Same 20×40mm form factor** — drop-in compatible with SO-ARM101 printed parts
+- **12-bit magnetic encoder** (4096 counts/revolution) — wear-free, full 360° sensing, higher resolution than the STS3215's feedback
+- **Motor mode** — the servo can be switched between position control and continuous rotation mode via software, which can theoretically be used for freedrive experimentation
+- **30 kg·cm torque at 12V** — equivalent to the STS3215
+- **Same 20×40mm form factor** — fits SO-ARM101 printed parts without modification, 25T spline on the output shaft
 
 ### Controller: Hiwonder BusLinker V3.0
 
@@ -39,35 +36,10 @@ USB-to-serial adapter for the Hiwonder servo bus. All six servos daisy-chain on 
 | M2/M3 hardware, cables | misc | $10 |
 | **Total** | | **~$130-150** |
 
-## Software Architecture
-
-```
-armctl/
-├── core/
-│   ├── arm.py             # ArmController — central API
-│   ├── kinematics.py      # Forward/inverse kinematics (DH parameters, Jacobian IK)
-│   ├── trajectory.py      # Trapezoidal velocity interpolation, threaded playback
-│   └── waypoint.py        # Waypoint & Program models, JSON persistence
-├── drivers/
-│   ├── base.py            # ServoDriver ABC
-│   ├── simulated.py       # Simulated driver for development without hardware
-│   └── hiwonder.py        # HX-30HM protocol driver via BusLinker serial
-├── config/
-│   └── arm_config.py      # DH parameters, joint limits, servo mappings
-├── gui/                   # Desktop GUI (planned)
-├── main.py                # Entry point
-└── setup_hardware.py      # Hardware setup, testing, and servo ID configuration
-```
-
-### Driver Abstraction
-
-Everything above the `drivers/` layer talks to an abstract `ServoDriver` interface. Swap one import to switch between simulated and real hardware — develop and test motion programs without the arm plugged in, then run them on real hardware with no code changes.
 
 ### Freedrive Implementation
 
-Freedrive mode unloads servo torque and continuously reads joint positions via the magnetic encoders at ~10 Hz. The arm can be moved freely by hand while the software tracks exactly where it is. Press a key to snapshot the current joint angles as a named waypoint.
-
-For smoother feel, the driver can optionally engage electromagnetic braking (motor mode, speed=0) instead of full unload, providing tunable resistance.
+Freedrive mode disables servo torque and continuously reads joint positions via the magnetic encoders. The arm can be moved freely by hand while the software tracks exactly where it is. Press a key to snapshot the current joint angles as a named waypoint. Gravity compensation to counteract arm weight during freedrive is on the roadmap.
 
 ### Kinematics
 
@@ -76,7 +48,6 @@ Forward kinematics via DH parameter chain. Inverse kinematics using a damped lea
 ### Motion Programs
 
 Programs are ordered lists of waypoints with per-step speed and delay settings. Playback uses trapezoidal velocity profiles for smooth acceleration/deceleration. Programs save as JSON and support looping.
-
 
 ## Mechanical Design
 
