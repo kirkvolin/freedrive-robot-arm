@@ -8,7 +8,7 @@ Built on the [SO-ARM101](https://github.com/TheRobotStudio/SO-ARM100) open-sourc
 
 The SO-ARM101 is designed for leader-follower teleoperation: you physically puppet a second "leader" arm to control the "follower." This works well for imitation learning pipelines like [LeRobot](https://github.com/huggingface/lerobot), but it means you need two arms, and the workflow is geared toward ML data collection rather than manual program building.
 
-Industrial robots from Universal Robots, FANUC, and others offer a different interaction model — **freedrive mode** — where you grab the robot itself, guide it through positions by hand, and tap "save" at each point to build a program. No second arm, no code, no joystick. ArmCTL brings that workflow to a $200 desktop arm.
+Industrial robots from Universal Robots, FANUC, and others offer a different interaction model — **freedrive mode** — where you grab the robot itself, guide it through positions by hand, and tap "save" at each point to build a program. No second arm, no code, no joystick. This project brings that workflow to a $200 desktop arm.
 
 ## Hardware Changes
 
